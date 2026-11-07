@@ -1,6 +1,6 @@
 import "./polyfills.ts"
 import { BufferLike, StreamLike, normalizeInput, ReadableFromIterator } from "./input.ts"
-import { normalizeMetadata } from "./metadata.ts"
+import { normalizeMetadata, isSizeExact } from "./metadata.ts"
 import { loadFiles, contentLength, ForAwaitable } from "./zip.ts"
 
 /** The file name, modification date and size will be read from the input;
@@ -60,7 +60,7 @@ function mapFiles(files: ForAwaitable<InputWithMeta | InputWithSizeMeta | InputW
       const [metaArgs, dataArgs] = normalizeArgs(res.value)
       // @ts-ignore type inference isn't good enough for this… yet…
       // but rewriting the code to be more explicit would make it longer
-      return { done: false, value: Object.assign(normalizeInput(...dataArgs), normalizeMetadata(...metaArgs)) }
+      return { done: false, value: Object.assign(normalizeInput(...dataArgs), normalizeMetadata(...metaArgs), { sizeIsExact: isSizeExact(metaArgs[0], metaArgs[2]) }) }
     },
     throw: iterator.throw?.bind(iterator),
     [Symbol.asyncIterator]() { return this }
@@ -81,6 +81,8 @@ export function downloadZip(files: ForAwaitable<InputWithMeta | InputWithSizeMet
 }
 
 export function makeZip(files: ForAwaitable<InputWithMeta | InputWithSizeMeta | InputWithoutMeta | InputFolder>, options: Options = {}) {
+  // fail early, not in the middle of the archive, where CompressionStream or "deflate-raw" is missing
+  if (options.compress) new CompressionStream("deflate-raw")
   const mapped = mapFiles(files)
   return ReadableFromIterator(loadFiles(mapped, options), mapped);
 }

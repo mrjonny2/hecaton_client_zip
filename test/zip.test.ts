@@ -168,6 +168,17 @@ Deno.test("the ZIP centralHeader function makes ZIP64 central record file header
   assertEquals(actual, expected)
 })
 
+Deno.test("the ZIP centralHeader function points both sizes and the offset to a 28-byte Zip64 field", () => {
+  // compressed below 4 GiB, original above, small offset: the Zip64 field holds all three values in order
+  const file = {...baseFile, uncompressedSize: 0x140000000n, compressedSize: 0x00500000n, crc: 0x12345678}
+  const offset = 0x01020304n
+  const actual = centralHeader(file, offset, 0, 28, true)
+  const expected = BufferFromHex("504b01022d032d000800080000109a4e78563412ffffffffffffffff0b001c000000000000000000b481ffffffff")
+  assertEquals(actual, expected)
+  const extra = zip64ExtraField(file, offset, 28)
+  assertEquals(extra, BufferFromHex("0100180000000040010000000000500000000000040302010000000"+"0"))
+})
+
 Deno.test("the ZIP centralHeader function makes central record folder headers", () => {
   const offset = 0x01020304n
   const actual = centralHeader(baseFolder, offset, 0, 0)

@@ -78,3 +78,36 @@ Deno.test("downloadZip writes ZIP version 2.0 and DEFLATE entries that inflate b
   const inflated = await new Response(new Response(data as Uint8Array<ArrayBuffer>).body!.pipeThrough(new DecompressionStream("deflate-raw"))).arrayBuffer()
   assertEquals(new Uint8Array(inflated), zipSpec)
 })
+
+Deno.test("downloadZip announces ZIP version 2.0 only for entries whose size is known in advance", async () => {
+  const stream = () => new Blob(["streamed"]).stream()
+  const makeInputs = () => [
+    { name: "blob", input: new Blob(["blob"]), expected: 20 },
+    { name: "string", input: "string", expected: 20 },
+    { name: "buffer", input: new Uint8Array(3), expected: 20 },
+    { name: "empty", input: new Blob([]), expected: 20 },
+    { name: "sized-stream", input: stream(), size: 8, expected: 20 },
+    { name: "stream", input: stream(), expected: 45 },
+    { name: "response-with-length", input: new Response("four", { headers: { "content-length": "4" } }), expected: 20 },
+    { name: "response-without-length", input: new Response(stream()), expected: 45 },
+    { name: "response-encoded", input: new Response("four", { headers: { "content-length": "4", "content-encoding": "gzip" } }), expected: 45 },
+    { name: "folder", expected: 20 },
+  ]
+  for (const compress of [false, true]) {
+    const inputs = makeInputs()
+    const zip = new Uint8Array(await downloadZip(inputs.map(({ expected: _, ...file }) => file), { compress }).arrayBuffer())
+    const view = new DataView(zip.buffer)
+    let central = view.getUint32(zip.length - 6, true)
+    for (const { name, expected } of inputs) {
+      assertEquals(view.getUint32(central), 0x504b0102)
+      const nameLength = view.getUint16(central + 28, true)
+      const entryName = new TextDecoder().decode(zip.subarray(central + 46, central + 46 + nameLength))
+      assertEquals(entryName.replace(/\/$/, ""), name)
+      assertEquals([name, view.getUint16(central + 6, true)], [name, expected])
+      const local = view.getUint32(central + 42, true)
+      assertEquals([name, view.getUint16(local + 4, true)], [name, expected])
+      assertEquals([name, view.getUint16(central + 10, true)], [name, compress && name !== "folder" ? 8 : 0])
+      central += 46 + nameLength + view.getUint16(central + 30, true)
+    }
+  }
+})
