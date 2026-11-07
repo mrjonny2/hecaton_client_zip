@@ -55,7 +55,7 @@ client-zip works in all modern browsers (and Deno) out of the box. If you bundle
 
 The default release of version 2 targets ES2020 and is a bare ES module + an IIFE version suitable for a ServiceWorker's `importScript`. Version 1 releases were built for ES2018.
 
-When necessary, client-zip version 2 will generate Zip64 archives. Entries whose size is known in advance (a `File`, `Blob`, string, buffer, or any input with a `size`) and that need no Zip64 field say "ZIP version 2.0 required to unzip". Other entries specify version 4.5, because a stream of unknown length might turn out to need Zip64; those may not be readable by every ZIP reader out there.
+When necessary, client-zip version 2 will generate Zip64 archives. Entries whose size is known in advance (a `File`, `Blob`, string, buffer, a `Response` with a Content-Length and no Content-Encoding, or any input with a `size`) and that need no Zip64 field say "ZIP version 2.0 required to unzip". Other entries specify version 4.5, because a stream of unknown length might turn out to need Zip64; those may not be readable by every ZIP reader out there. If an entry announced as 2.0 ends up needing a Zip64 field after all (because it starts beyond 4 GiB in the archive, or a given `size` was wrong), its central directory record says 4.5 while its local header still says 2.0.
 
 # Usage
 
