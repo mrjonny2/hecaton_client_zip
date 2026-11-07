@@ -4,6 +4,10 @@ import type { BufferLike, StreamLike } from "./input.ts"
 export type Metadata = {
   encodedName: Uint8Array
   uncompressedSize?: bigint
+  /** bytes actually written for the file's data (differs from uncompressedSize only when compressing) */
+  compressedSize?: bigint
+  /** "version needed to extract" announced in the local header, so the central header can match it */
+  zipVersion?: number
   /** keep track of whether the filename was supplied as a Buffer-like object */
   nameIsBuffer: boolean
 }
